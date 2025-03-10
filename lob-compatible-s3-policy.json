@@ -1,0 +1,21 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicReadForPDFsOnly",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::print-drops-purgatory/pdfs/*"
+        },
+        {
+            "Sid": "AllowPutObjectForIAMUser",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::194722429087:user/secrets-manager-service-use"
+            },
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::print-drops-purgatory/pdfs/*"
+        }
+    ]
+}
