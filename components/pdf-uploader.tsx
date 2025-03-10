@@ -138,18 +138,24 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
       {!file ? (
         <Card className="border-dashed border-2 p-10 text-center">
           <div
-            className="flex flex-col items-center justify-center cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
+            className="flex flex-col items-center justify-center"
           >
             <FileUp className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium mb-2">Drag and drop your PDF here</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">or click to browse (max 10MB)</p>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>Select PDF</Button>
             <input
               type="file"
               accept="application/pdf"
-              className="hidden"
-              onChange={handleFileChange}
+              className="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-md file:border-0
+                file:text-sm file:font-semibold
+                file:bg-primary file:text-white
+                hover:file:bg-primary/90"
+              onChange={(e) => {
+                console.log("File input change event triggered", e.target.files);
+                handleFileChange(e);
+              }}
               ref={fileInputRef}
             />
           </div>
