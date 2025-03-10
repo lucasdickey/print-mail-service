@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache"
 import Lob from "lob"
 import Stripe from "stripe"
 
-// Initialize Lob client
-const lob = new Lob(process.env.LOB_API_KEY!)
+// Lob API client
+const lobApiKey = process.env.LOB_API_KEY || '';
+export const lob = new (Lob as any)(lobApiKey);
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -179,4 +180,3 @@ export async function uploadFile(formData: FormData) {
   console.error("uploadFile is not implemented in lib/actions.ts.  It should be using S3.")
   return { error: "uploadFile is not implemented.  It should be using S3." }
 }
-

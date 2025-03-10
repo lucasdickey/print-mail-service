@@ -69,6 +69,14 @@ export function OrderConfirmation({ orderData }: OrderConfirmationProps) {
         </div>
       </Card>
 
+      {orderData.isMockLob && (
+        <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+          <p className="text-sm text-yellow-800 dark:text-yellow-400">
+            <strong>Note:</strong> This is using a mock mailing service. In production, your document would be sent via Lob's actual printing and mailing service.
+          </p>
+        </div>
+      )}
+
       <div className="flex justify-center pt-4">
         <Button asChild>
           <Link href="/">Print Another Document</Link>
@@ -77,4 +85,3 @@ export function OrderConfirmation({ orderData }: OrderConfirmationProps) {
     </div>
   )
 }
-

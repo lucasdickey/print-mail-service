@@ -95,12 +95,22 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
         }),
       });
       
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || "Failed to upload file to S3");
+      let uploadResult;
+      
+      try {
+        // Try to parse the response as JSON
+        uploadResult = await uploadResponse.json();
+      } catch (parseError) {
+        console.error("Failed to parse response as JSON:", parseError);
+        // If the response is not JSON, get the text and log it
+        const responseText = await uploadResponse.text();
+        console.error("Response text:", responseText);
+        throw new Error("Server returned an invalid response");
       }
       
-      const uploadResult = await uploadResponse.json();
+      if (!uploadResponse.ok) {
+        throw new Error(uploadResult?.error || `Failed to upload file to S3: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      }
       
       if (!uploadResult.success || !uploadResult.fileUrl) {
         throw new Error("Failed to get file URL from S3");

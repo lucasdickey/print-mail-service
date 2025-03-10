@@ -209,12 +209,13 @@ function CheckoutForm({
           throw new Error(mailingResult.error)
         }
 
-        // Complete the process with mock data since we're not using real Lob API in this demo
+        // Complete the process
         onComplete({
           price,
           orderId: paymentIntent.id,
           trackingId: mailingResult.trackingId || `trk_${Math.random().toString(36).substring(2, 10)}`,
           expectedDelivery: mailingResult.expectedDelivery || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          isMockLob: mailingResult.isMock || false
         })
       }
     } catch (error) {

@@ -28,6 +28,7 @@ export type OrderData = {
   orderId?: string
   trackingId?: string
   expectedDelivery?: string
+  isMockLob?: boolean
 }
 
 export function PrintMailWizard() {
@@ -102,4 +103,3 @@ export function PrintMailWizard() {
     </Card>
   )
 }
-

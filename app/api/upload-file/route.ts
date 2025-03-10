@@ -26,7 +26,10 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
     
-    console.log(`Processing file upload for: ${fileName}`);
+    // Create a URL-safe filename by replacing spaces and special characters
+    const safeFileName = encodeURIComponent(fileName.replace(/\s+/g, '-'));
+    
+    console.log(`Processing file upload for: ${fileName} (safe name: ${safeFileName})`);
     
     // Check environment variables
     const awsRegion = process.env.AWS_REGION;
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
       }
       
       // Generate a mock S3 URL
-      const mockS3Url = `https://mock-s3-bucket.s3.amazonaws.com/pdfs/${Date.now()}-${fileName}`;
+      const mockS3Url = `https://mock-s3-bucket.s3.amazonaws.com/pdfs/${Date.now()}-${safeFileName}`;
       console.log("Generated mock S3 URL:", mockS3Url);
       
       return NextResponse.json({
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(base64Data, 'base64');
     
     // Create a unique key for the S3 object
-    const key = `pdfs/${Date.now()}-${fileName}`;
+    const key = `pdfs/${Date.now()}-${safeFileName}`;
     
     try {
       // Upload to S3
@@ -82,42 +85,52 @@ export async function POST(request: Request) {
         // ACL parameter removed since ACLs are disabled on the bucket
       });
       
-      await s3Client.send(putCommand);
-      
-      // Generate a URL for the uploaded file
-      // For buckets with website hosting enabled, use the website endpoint
-      // Otherwise use the S3 endpoint
-      const fileUrl = `https://${awsS3Bucket}.s3.${awsRegion}.amazonaws.com/${key}`;
-      console.log("File uploaded to S3 successfully:", fileUrl);
-      
-      return NextResponse.json({
-        success: true,
-        fileUrl: fileUrl,
-        message: "File uploaded to S3 successfully"
-      });
-    } catch (error: any) {
-      console.error("Error uploading to S3:", error);
-      
-      // Check for specific AWS errors
-      if (error.Code === 'InvalidAccessKeyId' || error.Code === 'SignatureDoesNotMatch') {
-        console.log("Invalid AWS credentials. Falling back to mock implementation.");
+      try {
+        await s3Client.send(putCommand);
         
-        // Generate a mock S3 URL as fallback
-        const mockS3Url = `https://mock-s3-bucket.s3.amazonaws.com/pdfs/${Date.now()}-${fileName}`;
-        console.log("Generated mock S3 URL as fallback:", mockS3Url);
+        // Generate a URL for the uploaded file
+        // For buckets with website hosting enabled, use the website endpoint
+        // Otherwise use the S3 endpoint
+        const fileUrl = `https://${awsS3Bucket}.s3.${awsRegion}.amazonaws.com/${key}`;
+        console.log("File uploaded to S3 successfully:", fileUrl);
         
         return NextResponse.json({
           success: true,
-          fileUrl: mockS3Url,
-          message: "Using mock implementation due to invalid AWS credentials. Please update your .env.local file with valid AWS credentials."
+          fileUrl: fileUrl,
+          message: "File uploaded to S3 successfully"
         });
+      } catch (s3Error: any) {
+        console.error("S3 Error Details:", {
+          message: s3Error.message,
+          code: s3Error.code,
+          name: s3Error.name,
+          requestId: s3Error.$metadata?.requestId,
+          statusCode: s3Error.$metadata?.httpStatusCode,
+          stack: s3Error.stack
+        });
+        
+        // Check for specific AWS errors
+        if (s3Error.code === 'AccessDenied') {
+          console.error("Access denied to S3 bucket. Check IAM permissions.");
+          return NextResponse.json({ 
+            error: "Access denied to S3 bucket. Please check your IAM permissions." 
+          }, { status: 403 });
+        } else if (s3Error.code === 'NoSuchBucket') {
+          console.error(`Bucket ${awsS3Bucket} does not exist.`);
+          return NextResponse.json({ 
+            error: `Bucket ${awsS3Bucket} does not exist.` 
+          }, { status: 404 });
+        } else {
+          console.error("Other S3 error:", s3Error.message);
+          return NextResponse.json({ 
+            error: `Error uploading to S3: ${s3Error.message}` 
+          }, { status: 500 });
+        }
       }
-      
-      // Provide detailed error information
+    } catch (error: any) {
+      console.error("Error processing upload request:", error);
       return NextResponse.json({ 
-        error: "Failed to upload to S3: " + (error.message || "Unknown error"),
-        details: error.Code || error.name || "No error details available",
-        requestId: error.$metadata?.requestId || "No request ID available"
+        error: "Error processing upload request: " + (error.message || "Unknown error") 
       }, { status: 500 });
     }
   } catch (error: any) {
