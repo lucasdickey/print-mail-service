@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { FileUp, File, X } from "lucide-react"
+import { FileUp, File, X, Loader2, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 type PDFUploaderProps = {
@@ -16,6 +16,7 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [isMockImplementation, setIsMockImplementation] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -62,13 +63,9 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
         })
       }, 200)
 
-      // Create FormData and upload using base64 encoding
-      const formData = new FormData()
-      formData.append("file", file)
-
-      console.log("Client - Starting file upload using BASE64 encoding", file.name)
+      console.log("Client - Starting file upload to S3", file.name)
       
-      // Read the file directly as base64 instead of using server action
+      // Read the file as base64
       const reader = new FileReader()
       
       // Create a promise to handle the FileReader
@@ -84,32 +81,53 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
         reader.readAsDataURL(file)
       })
       
-      console.log("Client - Base64 encoding completed")
+      console.log("Client - Base64 encoding completed, uploading to S3...")
       
-      // Use the base64 result directly
-      const result = {
-        success: true,
-        url: base64Result,
-        fileName: file.name,
-        fileSize: file.size
+      // Upload the file to S3 via our API endpoint
+      const uploadResponse = await fetch('/api/upload-file', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          fileData: base64Result,
+          fileName: file.name
+        }),
+      });
+      
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || "Failed to upload file to S3");
       }
       
-      console.log("Client - Upload result:", result)
-
+      const uploadResult = await uploadResponse.json();
+      
+      if (!uploadResult.success || !uploadResult.fileUrl) {
+        throw new Error("Failed to get file URL from S3");
+      }
+      
+      console.log("Client - File uploaded to S3 successfully");
+      
       clearInterval(progressInterval)
       setUploadProgress(100)
 
+      if (uploadResult.message && uploadResult.message.includes('mock implementation')) {
+        setIsMockImplementation(true);
+      } else {
+        setIsMockImplementation(false);
+      }
+
       toast({
         title: "File uploaded successfully",
-        description: "Your PDF is ready for printing using base64 encoding",
+        description: "Your PDF is ready for printing",
       })
 
       // Wait a moment before proceeding
       setTimeout(() => {
-        onComplete(file, result.url)
+        onComplete(file, uploadResult.fileUrl)
       }, 1000)
     } catch (error) {
-      console.error("Client - Unexpected error:", error)
+      console.error("Client - Upload error:", error)
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -123,6 +141,7 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
   const removeFile = () => {
     setFile(null)
     setUploadProgress(0)
+    setIsMockImplementation(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -185,12 +204,39 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
-              <p className="text-sm text-center text-gray-500 dark:text-gray-400">Uploading... {uploadProgress}%</p>
+              <p className="text-sm text-center text-gray-500 dark:text-gray-400">
+                {uploadProgress < 100 ? (
+                  <>Uploading... {uploadProgress}%</>
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Processing...
+                  </div>
+                )}
+              </p>
             </div>
           ) : (
             <Button className="w-full" onClick={handleUpload}>
-              Continue
+              Upload to S3
             </Button>
+          )}
+          {isMockImplementation && (
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">Mock S3 Upload</h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>
+                      This is using a mock S3 implementation. In production, the file would be uploaded to an actual S3 bucket.
+                      To enable real S3 uploads, configure valid AWS credentials in the .env.local file.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </Card>
       )}
