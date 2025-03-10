@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
 
-// Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+// Initialize Stripe with the actual API key
+const stripe = new Stripe("zSAPq8mXbsRpedFX2nfUy7XrBYN8Hxke", {
   apiVersion: "2023-10-16",
 })
 
@@ -26,4 +26,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Error creating payment intent" }, { status: 500 })
   }
 }
-

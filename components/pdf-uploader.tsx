@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { FileUp, File, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { uploadFileBase64 } from "@/lib/actions"
 
 type PDFUploaderProps = {
   onComplete: (file: File, fileUrl: string) => void
@@ -68,23 +67,37 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
       formData.append("file", file)
 
       console.log("Client - Starting file upload using BASE64 encoding", file.name)
-      // Use base64 encoding instead of S3
-      const result = await uploadFileBase64(formData)
+      
+      // Read the file directly as base64 instead of using server action
+      const reader = new FileReader()
+      
+      // Create a promise to handle the FileReader
+      const base64Result = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result)
+          } else {
+            reject(new Error('Failed to read file as base64'))
+          }
+        }
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(file)
+      })
+      
+      console.log("Client - Base64 encoding completed")
+      
+      // Use the base64 result directly
+      const result = {
+        success: true,
+        url: base64Result,
+        fileName: file.name,
+        fileSize: file.size
+      }
+      
       console.log("Client - Upload result:", result)
 
       clearInterval(progressInterval)
       setUploadProgress(100)
-
-      if (result.error) {
-        console.error("Client - Upload error:", result.error)
-        toast({
-          title: "Upload failed",
-          description: result.error,
-          variant: "destructive",
-        })
-        setIsUploading(false)
-        return
-      }
 
       toast({
         title: "File uploaded successfully",
@@ -131,7 +144,7 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
             <FileUp className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium mb-2">Drag and drop your PDF here</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">or click to browse (max 10MB)</p>
-            <Button variant="outline">Select PDF</Button>
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>Select PDF</Button>
             <input
               type="file"
               accept="application/pdf"
@@ -178,4 +191,3 @@ export function PDFUploader({ onComplete }: PDFUploaderProps) {
     </div>
   )
 }
-
