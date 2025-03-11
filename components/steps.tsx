@@ -14,18 +14,18 @@ type StepsProps = {
 
 export function Steps({ steps, currentStep, className }: StepsProps) {
   return (
-    <div className={cn("flex justify-between", className)}>
+    <div className={cn("grid grid-cols-4 gap-2 w-full", className)}>
       {steps.map((step, index) => {
         const isActive = step.id === currentStep
         const isCompleted = steps.findIndex((s) => s.id === currentStep) > index
 
         return (
-          <div key={step.id} className={cn("flex flex-col items-center space-y-2 relative", index > 0 && "flex-1")}>
+          <div key={step.id} className="flex flex-col items-center relative">
             {index > 0 && (
               <div
                 className={cn(
-                  "absolute top-3 w-full h-0.5 -left-1/2",
-                  isCompleted ? "bg-primary" : "bg-gray-200 dark:bg-gray-700",
+                  "absolute top-3 h-0.5 w-full -left-1/2",
+                  isCompleted ? "bg-primary" : "bg-gray-200",
                 )}
               />
             )}
@@ -36,7 +36,7 @@ export function Steps({ steps, currentStep, className }: StepsProps) {
                 isActive && "bg-primary text-primary-foreground",
                 isCompleted
                   ? "bg-primary text-primary-foreground"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400",
+                  : "bg-gray-200 text-gray-600",
               )}
             >
               {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : index + 1}
@@ -44,9 +44,9 @@ export function Steps({ steps, currentStep, className }: StepsProps) {
 
             <span
               className={cn(
-                "text-sm font-medium",
+                "text-sm font-medium mt-2 text-center",
                 isActive && "text-primary",
-                !isActive && !isCompleted && "text-gray-500 dark:text-gray-400",
+                !isActive && !isCompleted && "text-gray-500",
               )}
             >
               {step.label}
@@ -57,4 +57,3 @@ export function Steps({ steps, currentStep, className }: StepsProps) {
     </div>
   )
 }
-

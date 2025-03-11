@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "PDF Print & Mail Service",
   description: "Upload PDFs and have them printed and mailed to any address",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light">
           {children}
           <Toaster />
         </ThemeProvider>
@@ -29,7 +29,3 @@ export default function RootLayout({
     </html>
   )
 }
-
-
-
-import './globals.css'
