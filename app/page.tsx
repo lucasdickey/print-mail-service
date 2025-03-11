@@ -3,7 +3,7 @@ import { PrintMailWizard } from "@/components/print-mail-wizard"
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <main className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto py-8 px-4">
         <h1 className="text-3xl font-bold text-center mb-2">Print & Mail Your Documents</h1>
@@ -15,4 +15,3 @@ export default function Home() {
     </main>
   )
 }
-

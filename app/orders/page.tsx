@@ -26,7 +26,7 @@ const mockOrders = [
 
 export default function OrdersPage() {
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <main className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto py-8 px-4">
         <h1 className="text-3xl font-bold mb-8">My Orders</h1>
@@ -38,16 +38,16 @@ export default function OrdersPage() {
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Order #{order.id}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{order.date}</p>
+                      <p className="text-sm text-gray-500">Order #{order.id}</p>
+                      <p className="text-sm text-gray-500">{order.date}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-medium">${order.price.toFixed(2)}</p>
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           order.status === "Delivered"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-blue-100 text-blue-800"
                         }`}
                       >
                         {order.status}
@@ -59,7 +59,7 @@ export default function OrdersPage() {
                     <FileText className="h-5 w-5 text-primary mt-0.5" />
                     <div>
                       <p className="font-medium">Document</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{order.documentName}</p>
+                      <p className="text-sm text-gray-500">{order.documentName}</p>
                     </div>
                   </div>
 
@@ -67,7 +67,7 @@ export default function OrdersPage() {
                     <Truck className="h-5 w-5 text-primary mt-0.5" />
                     <div>
                       <p className="font-medium">Shipping</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-gray-500">
                         Tracking ID: {order.trackingId}
                         <br />
                         Expected Delivery: {order.deliveryDate}
@@ -83,4 +83,3 @@ export default function OrdersPage() {
     </main>
   )
 }
-
