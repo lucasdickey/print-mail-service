@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ConvexHttpClient } from 'convex/browser';
-import { api } from '@/convex/_generated/api';
 
 // Initialize Claude client
 const claude = new Anthropic({
@@ -71,13 +70,23 @@ export interface DocumentAnalysisResult {
  * @param documentType The type of the document (blog post, academic paper, etc.)
  * @param description The user-provided description of the document
  * @param documentUrl The URL to the PDF document
+ * @param metadata Optional additional metadata about the document
  * @returns Analysis results including category, summary, themes, entities, and social handles
  */
 export async function analyzeDocument(
   documentName: string,
   documentType: string,
   description: string,
-  documentUrl: string
+  documentUrl: string,
+  metadata?: {
+    language?: string;
+    publicationYear?: number;
+    targetAudience?: string;
+    contentRating?: string;
+    tags?: string;
+    isOriginalWork?: boolean;
+    uploaderName?: string;
+  }
 ): Promise<DocumentAnalysisResult> {
   try {
     console.log(`Analyzing document: ${documentName}`);
@@ -85,9 +94,10 @@ export async function analyzeDocument(
     // Get categories from database
     let categoriesPrompt = '';
     try {
-      // Use a direct string reference to the function to avoid TypeScript errors
+      // Bypass TypeScript checking for Convex function calls
+      // @ts-ignore - Convex HTTP client accepts string function paths
       const categoriesResponse = await convex.query("categories:getCategoriesForPrompt", {});
-      categoriesPrompt = categoriesResponse as string || '';
+      categoriesPrompt = categoriesResponse || '';
     } catch (error) {
       console.error('Error fetching categories:', error);
       categoriesPrompt = 'Academic, Business, Creative Writing, Technical, Legal, Medical, Educational, News, Personal, Reference, Science, Social, Other';
@@ -105,6 +115,21 @@ export async function analyzeDocument(
     ${categoriesPrompt}
     `;
     
+    // Build metadata section with any available metadata
+    let metadataSection = '';
+    if (metadata) {
+      metadataSection = `
+      Additional Metadata:
+      ${metadata.language ? `Language: ${metadata.language}` : ''}
+      ${metadata.publicationYear ? `Publication Year: ${metadata.publicationYear}` : ''}
+      ${metadata.targetAudience ? `Target Audience: ${metadata.targetAudience}` : ''}
+      ${metadata.contentRating ? `Content Rating: ${metadata.contentRating}` : ''}
+      ${metadata.tags ? `Tags: ${metadata.tags}` : ''}
+      ${metadata.isOriginalWork !== undefined ? `Original Work: ${metadata.isOriginalWork ? 'Yes' : 'No'}` : ''}
+      ${metadata.uploaderName ? `Uploader: ${metadata.uploaderName}` : ''}
+      `;
+    }
+    
     const userPrompt = `
     Please analyze this document with the following information:
     
@@ -112,6 +137,7 @@ export async function analyzeDocument(
     Document Type: ${documentType}
     Document Description: ${description}
     Document URL: ${documentUrl}
+    ${metadataSection}
     
     Extract the following information and format your response as JSON:
     1. Category: Assign ONE category from the predefined list

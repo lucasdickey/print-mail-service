@@ -8,7 +8,7 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL || '');
 
 export async function POST(req: NextRequest) {
   try {
-    const { documentId, documentName, documentType, description, fileUrl } = await req.json();
+    const { documentId, documentName, documentType, description, fileUrl, metadata } = await req.json();
 
     if (!documentId || !fileUrl) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
       documentName,
       documentType,
       description,
-      fileUrl
+      fileUrl,
+      metadata
     );
 
     if (!analysisResult) {
@@ -28,24 +29,22 @@ export async function POST(req: NextRequest) {
 
     // Update the document with analysis results
     try {
-      // Fix TypeScript error by using the name property
-      await convex.mutation(
-        api.documents.updateDocumentAnalysis.name,
-        {
-          documentId,
-          category: analysisResult.category,
-          summary: analysisResult.summary,
-          themes: analysisResult.themes,
-          entities: analysisResult.entities,
-          socialHandles: analysisResult.socialHandles,
-          readingLevel: analysisResult.readingLevel,
-          estimatedReadTime: analysisResult.estimatedReadTime,
-          keyPhrases: analysisResult.keyPhrases,
-          citations: analysisResult.citations,
-          tableOfContents: analysisResult.tableOfContents,
-          analyzed: true
-        }
-      );
+      // Use @ts-ignore to bypass TypeScript checking for Convex function calls
+      // @ts-ignore - Convex HTTP client accepts string function paths
+      await convex.mutation("documents:updateDocumentAnalysis", {
+        documentId,
+        category: analysisResult.category,
+        summary: analysisResult.summary,
+        themes: analysisResult.themes,
+        entities: analysisResult.entities,
+        socialHandles: analysisResult.socialHandles,
+        readingLevel: analysisResult.readingLevel,
+        estimatedReadTime: analysisResult.estimatedReadTime,
+        keyPhrases: analysisResult.keyPhrases,
+        citations: analysisResult.citations,
+        tableOfContents: analysisResult.tableOfContents,
+        analyzed: true
+      });
 
       return NextResponse.json({ success: true, analysisResult });
     } catch (dbError) {

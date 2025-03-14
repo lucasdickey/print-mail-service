@@ -185,8 +185,8 @@ export default function UploadPage() {
         return
       }
 
-      // Trigger document analysis if it's public
-      if (isPublic && result.documentId) {
+      // Trigger document analysis for all documents
+      if (result.documentId) {
         try {
           // Call the analyze-document API
           await fetch('/api/analyze-document', {
@@ -200,6 +200,15 @@ export default function UploadPage() {
               documentType,
               description,
               fileUrl: result.url,
+              metadata: {
+                language,
+                publicationYear,
+                targetAudience,
+                contentRating,
+                tags,
+                isOriginalWork,
+                uploaderName
+              }
             }),
           });
         } catch (analysisError) {
@@ -299,16 +308,20 @@ export default function UploadPage() {
                         />
                       </div>
 
-                      {isPublic && (
-                        <div className="space-y-4 pt-2">
+                      {/* Document Metadata - Show only when a file is uploaded */}
+                      {file && (
+                        <div className="space-y-4 pt-4 mt-4 border-t">
+                          <h3 className="text-lg font-semibold">Document Metadata</h3>
+                          <p className="text-sm text-gray-500 mb-4">This information helps us provide better document analysis</p>
+                          
                           <div className="space-y-2">
-                            <Label htmlFor="document-name">Document Name*</Label>
+                            <Label htmlFor="document-name">Document Name{isPublic && "*"}</Label>
                             <Input
                               id="document-name"
                               placeholder="Enter a name for your document"
                               value={documentName}
                               onChange={(e) => setDocumentName(e.target.value)}
-                              required
+                              required={isPublic}
                             />
                           </div>
 
@@ -462,24 +475,24 @@ export default function UploadPage() {
                           </div>
                         </div>
                       )}
+
+                      {isUploading && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Uploading...</span>
+                            <span>{uploadProgress}%</span>
+                          </div>
+                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-primary" style={{ width: `${uploadProgress}%` }}></div>
+                          </div>
+                        </div>
+                      )}
+
+                      <Button type="submit" className="w-full" disabled={!file || isUploading}>
+                        {isUploading ? "Uploading..." : "Continue to Address"}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
                     </div>
-
-                    {isUploading && (
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Uploading...</span>
-                          <span>{uploadProgress}%</span>
-                        </div>
-                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-primary" style={{ width: `${uploadProgress}%` }}></div>
-                        </div>
-                      </div>
-                    )}
-
-                    <Button type="submit" className="w-full" disabled={!file || isUploading}>
-                      {isUploading ? "Uploading..." : "Continue to Address"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
                   </div>
                 </form>
               </CardContent>
