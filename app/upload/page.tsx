@@ -9,14 +9,94 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { UploadIcon as FileUpload, File, ArrowRight } from "lucide-react"
 import { uploadFile } from "@/lib/actions"
+
+// Document type options
+const documentTypes = [
+  "Blog Post",
+  "Academic White Paper",
+  "Sales Case Study",
+  "Poem",
+  "Speech",
+  "Transcribed Podcast",
+  "Research Paper",
+  "Technical Documentation",
+  "Book Chapter",
+  "News Article",
+  "Other"
+];
+
+// Ownership status options
+const ownershipStatuses = [
+  "I originated and own this document",
+  "I'm part of a team that originated and own this document",
+  "I'm a company that owns this document",
+  "I do not own this document",
+  "This document is in public domain"
+];
+
+// Content rating options
+const contentRatings = [
+  "General",
+  "Academic",
+  "Professional",
+  "Mature"
+];
+
+// Target audience options
+const targetAudiences = [
+  "General",
+  "Academic",
+  "Professional",
+  "Technical",
+  "Children",
+  "Young Adults",
+  "Adults"
+];
+
+// Language options
+const languages = [
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Chinese",
+  "Japanese",
+  "Other"
+];
+
+// Define the upload result type
+interface UploadResult {
+  url: string;
+  fileName: string;
+  fileSize: number;
+  documentId?: string;
+  error?: string;
+}
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [isPublic, setIsPublic] = useState(false)
+  const [documentName, setDocumentName] = useState("")
+  const [description, setDescription] = useState("")
+  const [documentType, setDocumentType] = useState(documentTypes[0])
+  const [ownershipStatus, setOwnershipStatus] = useState(ownershipStatuses[0])
+  const [tags, setTags] = useState("")
+  const [language, setLanguage] = useState(languages[0])
+  const [publicationYear, setPublicationYear] = useState<number | undefined>(undefined)
+  const [targetAudience, setTargetAudience] = useState(targetAudiences[0])
+  const [contentRating, setContentRating] = useState(contentRatings[0])
+  const [isOriginalWork, setIsOriginalWork] = useState(true)
+  const [uploaderName, setUploaderName] = useState("")
+  const [uploaderEmail, setUploaderEmail] = useState("")
+  
   const router = useRouter()
   const { toast } = useToast()
   const searchParams = useSearchParams()
@@ -49,6 +129,15 @@ export default function UploadPage() {
       return
     }
 
+    if (isPublic && !documentName) {
+      toast({
+        title: "Document name required",
+        description: "Please provide a name for your document",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsUploading(true)
 
     // Simulate upload progress
@@ -65,8 +154,23 @@ export default function UploadPage() {
     try {
       const formData = new FormData()
       formData.append("file", file)
+      
+      // Add metadata to formData
+      formData.append("isPublic", isPublic.toString())
+      formData.append("documentName", documentName || file.name)
+      formData.append("description", description)
+      formData.append("documentType", documentType)
+      formData.append("ownershipStatus", ownershipStatus)
+      formData.append("tags", tags)
+      formData.append("language", language)
+      formData.append("publicationYear", publicationYear?.toString() || "")
+      formData.append("targetAudience", targetAudience)
+      formData.append("contentRating", contentRating)
+      formData.append("isOriginalWork", isOriginalWork.toString())
+      formData.append("uploaderName", uploaderName)
+      formData.append("uploaderEmail", uploaderEmail)
 
-      const result = await uploadFile(formData)
+      const result = await uploadFile(formData) as UploadResult
 
       clearInterval(progressInterval)
       setUploadProgress(100)
@@ -81,10 +185,42 @@ export default function UploadPage() {
         return
       }
 
+      // Trigger document analysis if it's public
+      if (isPublic && result.documentId) {
+        try {
+          // Call the analyze-document API
+          await fetch('/api/analyze-document', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              documentId: result.documentId,
+              documentName: documentName || file.name,
+              documentType,
+              description,
+              fileUrl: result.url,
+            }),
+          });
+        } catch (analysisError) {
+          console.error("Error analyzing document:", analysisError);
+          // Continue even if analysis fails
+        }
+      }
+
       // Navigate to address page with file info
-      router.push(
-        `/address?fileUrl=${encodeURIComponent(result.url)}&fileName=${encodeURIComponent(result.fileName)}&fileSize=${result.fileSize}&type=${mailType}`,
-      )
+      const queryParams = new URLSearchParams({
+        fileUrl: result.url,
+        fileName: result.fileName,
+        fileSize: result.fileSize.toString(),
+        type: mailType
+      });
+      
+      if (result.documentId) {
+        queryParams.append('documentId', result.documentId);
+      }
+      
+      router.push(`/address?${queryParams.toString()}`);
     } catch (error) {
       clearInterval(progressInterval)
       console.error("Error uploading file:", error)
@@ -145,6 +281,185 @@ export default function UploadPage() {
                             />
                           </div>
                           <p className="text-xs text-gray-500 mt-2">Supported file: PDF only (max 10MB)</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Public Document Repository Options */}
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="public-toggle" className="font-medium">Make Document Public</Label>
+                          <p className="text-sm text-gray-500">Share this document in our public repository</p>
+                        </div>
+                        <Switch
+                          id="public-toggle"
+                          checked={isPublic}
+                          onCheckedChange={setIsPublic}
+                        />
+                      </div>
+
+                      {isPublic && (
+                        <div className="space-y-4 pt-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="document-name">Document Name*</Label>
+                            <Input
+                              id="document-name"
+                              placeholder="Enter a name for your document"
+                              value={documentName}
+                              onChange={(e) => setDocumentName(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="document-description">Description</Label>
+                            <Textarea
+                              id="document-description"
+                              placeholder="Provide a brief description of your document"
+                              value={description}
+                              onChange={(e) => setDescription(e.target.value)}
+                              rows={3}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="document-type">Document Type</Label>
+                            <Select value={documentType} onValueChange={setDocumentType}>
+                              <SelectTrigger id="document-type">
+                                <SelectValue placeholder="Select document type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {documentTypes.map((type) => (
+                                  <SelectItem key={type} value={type}>
+                                    {type}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="ownership-status">Ownership Status</Label>
+                            <Select value={ownershipStatus} onValueChange={setOwnershipStatus}>
+                              <SelectTrigger id="ownership-status">
+                                <SelectValue placeholder="Select ownership status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ownershipStatuses.map((status) => (
+                                  <SelectItem key={status} value={status}>
+                                    {status}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="tags">Tags (comma separated)</Label>
+                            <Input
+                              id="tags"
+                              placeholder="e.g., science, research, technology"
+                              value={tags}
+                              onChange={(e) => setTags(e.target.value)}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="language">Language</Label>
+                              <Select value={language} onValueChange={setLanguage}>
+                                <SelectTrigger id="language">
+                                  <SelectValue placeholder="Select language" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {languages.map((lang) => (
+                                    <SelectItem key={lang} value={lang}>
+                                      {lang}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="publication-year">Publication Year</Label>
+                              <Input
+                                id="publication-year"
+                                type="number"
+                                placeholder="e.g., 2023"
+                                value={publicationYear || ""}
+                                onChange={(e) => setPublicationYear(e.target.value ? parseInt(e.target.value) : undefined)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="target-audience">Target Audience</Label>
+                              <Select value={targetAudience} onValueChange={setTargetAudience}>
+                                <SelectTrigger id="target-audience">
+                                  <SelectValue placeholder="Select target audience" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {targetAudiences.map((audience) => (
+                                    <SelectItem key={audience} value={audience}>
+                                      {audience}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="content-rating">Content Rating</Label>
+                              <Select value={contentRating} onValueChange={setContentRating}>
+                                <SelectTrigger id="content-rating">
+                                  <SelectValue placeholder="Select content rating" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {contentRatings.map((rating) => (
+                                    <SelectItem key={rating} value={rating}>
+                                      {rating}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <Label htmlFor="original-work" className="font-medium">Original Work</Label>
+                              <p className="text-sm text-gray-500">Is this an original work?</p>
+                            </div>
+                            <Switch
+                              id="original-work"
+                              checked={isOriginalWork}
+                              onCheckedChange={setIsOriginalWork}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="uploader-name">Your Name</Label>
+                            <Input
+                              id="uploader-name"
+                              placeholder="Enter your name"
+                              value={uploaderName}
+                              onChange={(e) => setUploaderName(e.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="uploader-email">Your Email</Label>
+                            <Input
+                              id="uploader-email"
+                              type="email"
+                              placeholder="Enter your email"
+                              value={uploaderEmail}
+                              onChange={(e) => setUploaderEmail(e.target.value)}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -211,4 +526,3 @@ export default function UploadPage() {
     </div>
   )
 }
-
