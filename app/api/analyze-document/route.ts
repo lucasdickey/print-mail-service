@@ -28,16 +28,21 @@ export async function POST(req: NextRequest) {
 
     // Update the document with analysis results
     try {
-      // Use the updateDocumentAnalysis mutation from the API
-      // Fix TypeScript error by explicitly typing the API
-      await convex.mutation<typeof api.documents.updateDocumentAnalysis>(
-        "documents:updateDocumentAnalysis", 
+      // Fix TypeScript error by using the name property
+      await convex.mutation(
+        api.documents.updateDocumentAnalysis.name,
         {
           documentId,
           category: analysisResult.category,
           summary: analysisResult.summary,
           themes: analysisResult.themes,
           entities: analysisResult.entities,
+          socialHandles: analysisResult.socialHandles,
+          readingLevel: analysisResult.readingLevel,
+          estimatedReadTime: analysisResult.estimatedReadTime,
+          keyPhrases: analysisResult.keyPhrases,
+          citations: analysisResult.citations,
+          tableOfContents: analysisResult.tableOfContents,
           analyzed: true
         }
       );

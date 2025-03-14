@@ -1,24 +1,77 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { ConvexHttpClient } from 'convex/browser';
+import { api } from '@/convex/_generated/api';
 
 // Initialize Claude client
 const claude = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
+// Initialize Convex client
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL || '');
+
+// Valid entity types
+const VALID_ENTITY_TYPES = [
+  'person',
+  'organization',
+  'product',
+  'company',
+  'location',
+  'event',
+  'book',
+  'movie',
+  'music',
+  'publisher',
+  'other'
+] as const;
+
+// Valid social media platforms
+const VALID_PLATFORMS = [
+  'twitter',
+  'x',
+  'instagram',
+  'linkedin',
+  'facebook',
+  'tiktok',
+  'youtube',
+  'github',
+  'reddit',
+  'other'
+] as const;
+
 export interface DocumentAnalysisResult {
   category: string;
   summary: string;
   themes: string[];
-  entities: string[];
+  entities: Array<{
+    type: typeof VALID_ENTITY_TYPES[number];
+    name: string;
+  }>;
+  socialHandles: Array<{
+    platform: typeof VALID_PLATFORMS[number];
+    handle: string;
+    url: string;
+  }>;
+  readingLevel: string;
+  estimatedReadTime: string;
+  keyPhrases: string[];
+  citations: Array<{
+    type: 'book' | 'article' | 'website' | 'journal' | 'other';
+    title: string;
+    authors?: string[];
+    year?: number;
+    url?: string;
+  }>;
+  tableOfContents?: string[];
 }
 
 /**
- * Analyzes a PDF document using Claude API
+ * Analyzes a PDF document using Claude API with tool use
  * @param documentName The name of the document
  * @param documentType The type of the document (blog post, academic paper, etc.)
  * @param description The user-provided description of the document
  * @param documentUrl The URL to the PDF document
- * @returns Analysis results including category, summary, themes, and entities
+ * @returns Analysis results including category, summary, themes, entities, and social handles
  */
 export async function analyzeDocument(
   documentName: string,
@@ -29,28 +82,61 @@ export async function analyzeDocument(
   try {
     console.log(`Analyzing document: ${documentName}`);
     
-    // Create a prompt for Claude to analyze the document
-    const prompt = `
-    I need you to analyze a document with the following information:
+    // Get categories from database
+    let categoriesPrompt = '';
+    try {
+      // Use a direct string reference to the function to avoid TypeScript errors
+      const categoriesResponse = await convex.query("categories:getCategoriesForPrompt", {});
+      categoriesPrompt = categoriesResponse as string || '';
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      categoriesPrompt = 'Academic, Business, Creative Writing, Technical, Legal, Medical, Educational, News, Personal, Reference, Science, Social, Other';
+    }
+    
+    // Create a prompt for Claude to analyze the document using tool use
+    const systemPrompt = `
+    You are a document analysis assistant that extracts structured information from documents.
+    You will analyze the document and extract specific information using the tools provided.
+    
+    For entity types, only use these predefined types: ${VALID_ENTITY_TYPES.join(', ')}
+    For social media platforms, only use these predefined platforms: ${VALID_PLATFORMS.join(', ')}
+    
+    For document categories, use one of these predefined categories:
+    ${categoriesPrompt}
+    `;
+    
+    const userPrompt = `
+    Please analyze this document with the following information:
     
     Document Name: ${documentName}
     Document Type: ${documentType}
     Document Description: ${description}
     Document URL: ${documentUrl}
     
-    Please analyze this document and provide the following structured information:
+    Extract the following information and format your response as JSON:
+    1. Category: Assign ONE category from the predefined list
+    2. Summary: Write a 3-paragraph summary
+    3. Themes: Identify 3-5 main themes
+    4. Entities: Extract important entities, using ONLY the predefined entity types
+    5. Social Handles: Extract any social media handles and format as proper URLs
+    6. Reading Level: Determine the approximate reading level (Elementary, Middle School, High School, College, Graduate, Technical)
+    7. Estimated Read Time: How long would it take an average reader to read this document
+    8. Key Phrases: 5-10 key phrases that represent core concepts
+    9. Citations: Extract any references or citations
+    10. Table of Contents: Extract or generate a table of contents
     
-    1. Document Category: Assign a high-level category from standard non-fiction and fiction book categories.
-    2. Summary: Write a 3-paragraph summary of the document's content.
-    3. Key Themes: Identify 3-5 main themes discussed in the document.
-    4. Named Entities: List important people, organizations, locations, or other named entities mentioned.
-    
-    Format your response as JSON with the following structure:
+    Format your response as a valid JSON object with these fields:
     {
       "category": "string",
       "summary": "string",
-      "themes": ["string", "string", "string"],
-      "entities": ["string", "string", "string"]
+      "themes": ["string"],
+      "entities": [{"type": "string", "name": "string"}],
+      "socialHandles": [{"platform": "string", "handle": "string", "url": "string"}],
+      "readingLevel": "string",
+      "estimatedReadTime": "string",
+      "keyPhrases": ["string"],
+      "citations": [{"type": "string", "title": "string", "authors": ["string"], "year": number, "url": "string"}],
+      "tableOfContents": ["string"]
     }
     `;
     
@@ -58,18 +144,19 @@ export async function analyzeDocument(
     const message = await claude.messages.create({
       model: 'claude-3-opus-20240229',
       max_tokens: 4000,
+      system: systemPrompt,
       messages: [
         {
           role: 'user',
-          content: prompt,
+          content: userPrompt,
         },
       ],
     });
     
-    // Parse the response - handle different content types
+    // Parse the response
     let responseText = '';
     
-    // Check if the content is an array and extract text content
+    // Extract text content from the response
     if (Array.isArray(message.content)) {
       for (const block of message.content) {
         if ('type' in block && block.type === 'text' && 'text' in block) {
@@ -78,16 +165,58 @@ export async function analyzeDocument(
       }
     }
     
+    // Initialize result object with default values
+    const defaultResult: DocumentAnalysisResult = {
+      category: 'Uncategorized',
+      summary: 'No summary available.',
+      themes: [],
+      entities: [],
+      socialHandles: [],
+      readingLevel: 'Not determined',
+      estimatedReadTime: 'Unknown',
+      keyPhrases: [],
+      citations: []
+    };
+    
     // Extract JSON from the response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error('Failed to extract JSON from Claude response');
+      console.error('Failed to extract JSON from Claude response');
+      return defaultResult;
     }
     
-    const analysisResult = JSON.parse(jsonMatch[0]) as DocumentAnalysisResult;
-    console.log('Document analysis completed successfully');
-    
-    return analysisResult;
+    try {
+      const parsedResult = JSON.parse(jsonMatch[0]);
+      
+      // Validate and sanitize the result
+      const analysisResult: DocumentAnalysisResult = {
+        ...defaultResult,
+        ...parsedResult
+      };
+      
+      // Validate entity types
+      if (Array.isArray(analysisResult.entities)) {
+        analysisResult.entities = analysisResult.entities.map(entity => ({
+          type: VALID_ENTITY_TYPES.includes(entity.type as any) ? entity.type : 'other',
+          name: entity.name || 'Unknown'
+        }));
+      }
+      
+      // Validate social media platforms
+      if (Array.isArray(analysisResult.socialHandles)) {
+        analysisResult.socialHandles = analysisResult.socialHandles.map(handle => ({
+          platform: VALID_PLATFORMS.includes(handle.platform as any) ? handle.platform : 'other',
+          handle: handle.handle || '',
+          url: handle.url || ''
+        }));
+      }
+      
+      console.log('Document analysis completed successfully');
+      return analysisResult;
+    } catch (error) {
+      console.error('Error parsing Claude response:', error);
+      return defaultResult;
+    }
   } catch (error) {
     console.error('Error analyzing document with Claude:', error);
     // Return default values in case of error
@@ -95,7 +224,12 @@ export async function analyzeDocument(
       category: 'Uncategorized',
       summary: 'No summary available due to analysis error.',
       themes: ['Unknown'],
-      entities: ['Unknown'],
+      entities: [{ type: 'other', name: 'Unknown' }],
+      socialHandles: [],
+      readingLevel: 'Not determined',
+      estimatedReadTime: 'Unknown',
+      keyPhrases: [],
+      citations: []
     };
   }
 }

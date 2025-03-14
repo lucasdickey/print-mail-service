@@ -47,8 +47,43 @@ export default defineSchema({
     category: v.optional(v.string()),
     summary: v.optional(v.string()),
     themes: v.optional(v.array(v.string())),
-    entities: v.optional(v.array(v.string())),
+    
+    // Updated entity structure with types
+    entities: v.optional(v.array(v.object({
+      type: v.string(),
+      name: v.string(),
+    }))),
+    
+    // Social handles
+    socialHandles: v.optional(v.array(v.object({
+      platform: v.string(),
+      handle: v.string(),
+      url: v.string(),
+    }))),
+    
+    // New document analysis fields
+    readingLevel: v.optional(v.string()),
+    estimatedReadTime: v.optional(v.string()),
+    keyPhrases: v.optional(v.array(v.string())),
+    citations: v.optional(v.array(v.object({
+      type: v.string(),
+      title: v.string(),
+      authors: v.optional(v.array(v.string())),
+      year: v.optional(v.number()),
+      url: v.optional(v.string()),
+    }))),
+    tableOfContents: v.optional(v.array(v.string())),
   }),
+  
+  // Document categories table to store predefined categories
+  documentCategories: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    parentCategory: v.optional(v.id("documentCategories")),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_name", ["name"]),
   
   // Orders table to track document orders
   orders: defineTable({
