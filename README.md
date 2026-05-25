@@ -1,69 +1,75 @@
 # Print Mail Service
 
-A modern web application that allows users to upload PDF documents, process payments, and send physical mail through the Lob API.
+A web application that lets users upload a PDF, pay for it, and have it printed and
+mailed to a physical address via the [Lob](https://www.lob.com/) API.
 
-![Print Mail Service](https://i.imgur.com/example-image.png)
+## Features
 
-## 🚀 Features
+- **PDF upload** to AWS S3
+- **Payment processing** with Stripe
+- **Physical mail delivery** through Lob
+- **Modern UI** built with Next.js (App Router), React, and Tailwind CSS
 
-- **PDF Document Upload**: Upload PDF documents to AWS S3
-- **Payment Processing**: Secure payment handling with Stripe
-- **Physical Mail Delivery**: Send physical mail through Lob's API
-- **Order Tracking**: Track your mail orders with unique IDs
-- **Modern UI**: Clean, responsive interface built with Next.js and Tailwind CSS
+## How it works
 
-## 📋 Prerequisites
+The app is a single-page wizard (`/`) with four steps:
 
-Before you begin, ensure you have the following:
+1. **Upload** — the PDF is sent to `POST /api/upload` and stored in S3 (`pdfs/` prefix).
+2. **Address** — the user enters a US mailing address.
+3. **Payment** — a Stripe PaymentIntent is created (`POST /api/create-payment-intent`)
+   and confirmed client-side with Stripe Elements.
+4. **Confirmation** — once payment succeeds, `POST /api/send-mail` verifies the
+   payment with Stripe and creates a Lob letter.
 
-- Node.js 18.x or higher (specified in `.nvmrc`)
-- AWS account with S3 bucket configured
-- Stripe account for payment processing
-- Lob account for mail delivery services
-- Git for version control
+## Prerequisites
 
-## 🔧 Environment Variables
+- Node.js 20.9.0 (see `.nvmrc`)
+- An AWS account with an S3 bucket
+- A Stripe account
+- A Lob account
 
-Create a `.env.local` file in the root directory with the following variables:
+## Environment variables
 
+Copy `.env.example` to `.env.local` and fill in the values:
+
+```bash
+# AWS S3
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_S3_BUCKET=your-bucket-name
+
+# Stripe
+STRIPE_SECRET_KEY=sk_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_...
+
+# Lob
+LOB_API_KEY=...
 ```
-# AWS Configuration
-AWS_REGION=your-aws-region
-AWS_ACCESS_KEY_ID=your-access-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-access-key
-AWS_S3_BUCKET=your-s3-bucket-name
 
-# Stripe Configuration
-STRIPE_SECRET_KEY=your-stripe-secret-key
-STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
+## Getting started
 
-# Lob Configuration
-LOB_API_KEY=your-lob-api-key
+```bash
+npm install
+npm run dev
 ```
 
-## 🛠️ Installation
+Open [http://localhost:3000](http://localhost:3000).
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/print-mail-service.git
-   cd print-mail-service
-   ```
+### Scripts
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+| Script              | Description                          |
+| ------------------- | ------------------------------------ |
+| `npm run dev`       | Start the development server         |
+| `npm run build`     | Production build (runs TS + ESLint)  |
+| `npm run start`     | Serve the production build           |
+| `npm run lint`      | Run ESLint                           |
+| `npm run typecheck` | Type-check with `tsc --noEmit`       |
 
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
+## S3 bucket policy
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
-
-## 📝 S3 Bucket Policy
-
-For Lob to access your uploaded PDF files, ensure your S3 bucket has the appropriate policy. The bucket policy should allow public read access for files in the pdfs directory without referrer restrictions:
+Lob fetches the uploaded PDF over HTTP, so objects under the `pdfs/` prefix must be
+publicly readable:
 
 ```json
 {
@@ -80,55 +86,34 @@ For Lob to access your uploaded PDF files, ensure your S3 bucket has the appropr
 }
 ```
 
-## 🏗️ Project Structure
+## Project structure
 
 ```
 print-mail-service/
-├── app/                   # Next.js app directory
-│   ├── api/               # API routes
-│   │   ├── send-mail/     # Lob API integration
-│   │   └── upload-file/   # S3 upload functionality
-│   ├── layout.tsx         # Root layout component
-│   └── page.tsx           # Home page
-├── components/            # Reusable UI components
-├── public/                # Static assets
-├── .env.local             # Environment variables (not tracked by git)
-├── .nvmrc                 # Node.js version specification
-├── package.json           # Project dependencies
-├── tailwind.config.js     # Tailwind CSS configuration
-└── vercel.json            # Vercel deployment configuration
+├── app/
+│   ├── api/
+│   │   ├── create-payment-intent/   # Stripe PaymentIntent
+│   │   ├── send-mail/               # Lob letter creation
+│   │   └── upload/                  # PDF upload to S3
+│   ├── orders/                      # Order history (demo data)
+│   ├── payment-success/             # Stripe redirect target
+│   ├── layout.tsx
+│   └── page.tsx                     # Print & mail wizard
+├── components/                      # UI + flow components
+├── lib/                             # Stripe, Lob, and S3 clients
+├── types/                           # Type declarations
+└── public/                          # Static assets
 ```
 
-## 🚢 Deployment
+## Tech stack
 
-This application is configured for deployment on Vercel:
-
-1. Push your code to GitHub
-2. Connect your repository to Vercel
-3. Configure environment variables in Vercel dashboard
-4. Deploy!
-
-## 🧪 Testing
-
-Run the test suite with:
-
-```bash
-npm test
-```
-
-## 📚 Tech Stack
-
-- **Frontend**: Next.js, React 18, Tailwind CSS
-- **Backend**: Next.js API Routes
+- **Framework**: Next.js (App Router), React, TypeScript
+- **Styling**: Tailwind CSS, shadcn/ui
 - **Storage**: AWS S3
-- **Payment**: Stripe
-- **Mail Service**: Lob
+- **Payments**: Stripe
+- **Mail**: Lob
 - **Deployment**: Vercel
 
-## 🤝 Contributing
+## License
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT

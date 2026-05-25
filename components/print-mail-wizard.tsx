@@ -2,8 +2,6 @@
 
 import { useState } from "react"
 import { PDFUploader } from "./pdf-uploader"
-// Uncomment this if you want to use the S3 approach instead
-// import { PDFUploaderS3 } from "./pdf-uploader-s3"
 import { AddressForm } from "./address-form"
 import { PaymentForm } from "./payment-form"
 import { OrderConfirmation } from "./order-confirmation"
@@ -28,7 +26,6 @@ export type OrderData = {
   orderId?: string
   trackingId?: string
   expectedDelivery?: string
-  isMockLob?: boolean
 }
 
 export function PrintMailWizard() {
@@ -68,13 +65,6 @@ export function PrintMailWizard() {
             handleNext()
           }}
         />
-        // If you want to use the S3 approach instead, use this:
-        // <PDFUploaderS3
-        //   onComplete={(file, fileUrl) => {
-        //     updateOrderData({ file, fileUrl })
-        //     handleNext()
-        //   }}
-        // />
       )}
 
       {currentStep === "address" && (

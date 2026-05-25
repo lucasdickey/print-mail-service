@@ -12,7 +12,7 @@ import { loadStripe } from "@stripe/stripe-js"
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js"
 
 // Initialize Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_KEY as string)
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string)
 
 type PaymentFormProps = {
   orderData: OrderData
@@ -39,15 +39,15 @@ export function PaymentForm({ orderData, onComplete, onBack }: PaymentFormProps)
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             amount: Math.round(price * 100),
             metadata: {
-              fileName: orderData.file?.name,
-              fileSize: orderData.file?.size,
-            }
+              fileName: orderData.file?.name ?? "",
+              fileSize: String(orderData.file?.size ?? 0),
+            },
           }),
         });
-        
+
         const result = await response.json();
 
         if (result.error) {
@@ -213,9 +213,8 @@ function CheckoutForm({
         onComplete({
           price,
           orderId: paymentIntent.id,
-          trackingId: mailingResult.trackingId || `trk_${Math.random().toString(36).substring(2, 10)}`,
-          expectedDelivery: mailingResult.expectedDelivery || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-          isMockLob: mailingResult.isMock || false
+          trackingId: mailingResult.trackingId,
+          expectedDelivery: mailingResult.expectedDelivery,
         })
       }
     } catch (error) {

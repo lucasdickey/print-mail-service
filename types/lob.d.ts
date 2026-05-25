@@ -1,6 +1,7 @@
 declare module 'lob' {
   interface LobAddress {
     name: string;
+    company?: string;
     address_line1: string;
     address_line2?: string;
     address_city: string;
@@ -18,6 +19,7 @@ declare module 'lob' {
     double_sided?: boolean;
     address_placement?: string;
     mail_type?: string;
+    use_type?: string;
   }
 
   interface LobLetterResponse {
