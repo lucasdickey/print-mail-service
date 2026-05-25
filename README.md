@@ -65,6 +65,54 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run start`     | Serve the production build           |
 | `npm run lint`      | Run ESLint                           |
 | `npm run typecheck` | Type-check with `tsc --noEmit`       |
+| `npm run mcp`       | Start the stdio MCP server           |
+
+## Machine access (Machine Payments Protocol)
+
+In addition to the browser wizard, agents can use the service without a browser
+via [Stripe's Machine Payments Protocol (MPP)](https://docs.stripe.com/payments/machine/mpp),
+implemented with the [`mppx`](https://www.npmjs.com/package/mppx) SDK. Both
+surfaces below charge the same price and settle through Stripe.
+
+Set `MPP_SECRET_KEY` (see `.env.example`) in addition to the Stripe/Lob/S3 vars.
+
+### HTTP endpoint
+
+`POST /api/agent/print-mail` is gated by MPP:
+
+1. The agent POSTs `{ fileUrl, mailType?, address }` (the PDF must already be at
+   a public S3 URL — agents can upload one via `POST /api/upload`).
+2. With no payment, the server responds **`402 Payment Required`** with a
+   `WWW-Authenticate: Payment` challenge.
+3. The agent pays and retries with an `Authorization: Payment <credential>`
+   header. Once verified, the document is mailed and the response carries a
+   `Payment-Receipt` header.
+
+An MPP-aware client (e.g. `mppx/client`) handles steps 2–3 automatically.
+
+### MCP server
+
+`npm run mcp` starts a stdio [MCP](https://modelcontextprotocol.io) server
+exposing two tools:
+
+- `get_pricing` — free; returns the price.
+- `print_and_mail` — payment-gated. An unpaid call returns a JSON-RPC error
+  (code `-32042`) carrying the payment challenge; the agent's MPP-aware MCP
+  client pays and retries with the credential in the request `_meta`.
+
+Example MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "print-mail": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "/path/to/print-mail-service"
+    }
+  }
+}
+```
 
 ## S3 bucket policy
 
@@ -92,6 +140,7 @@ publicly readable:
 print-mail-service/
 ├── app/
 │   ├── api/
+│   │   ├── agent/print-mail/        # MPP-gated agent endpoint (402)
 │   │   ├── create-payment-intent/   # Stripe PaymentIntent
 │   │   ├── send-mail/               # Lob letter creation
 │   │   └── upload/                  # PDF upload to S3
@@ -100,7 +149,8 @@ print-mail-service/
 │   ├── layout.tsx
 │   └── page.tsx                     # Print & mail wizard
 ├── components/                      # UI + flow components
-├── lib/                             # Stripe, Lob, and S3 clients
+├── lib/                             # Stripe, Lob, S3, MPP clients + shared logic
+├── mcp/                             # Stdio MCP server
 ├── types/                           # Type declarations
 └── public/                          # Static assets
 ```
