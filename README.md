@@ -8,6 +8,7 @@ mailed to a physical address via the [Lob](https://www.lob.com/) API.
 - **PDF upload** to AWS S3
 - **Payment processing** with Stripe
 - **Physical mail delivery** through Lob
+- **Agent access** via the [Machine Payments Protocol](https://docs.stripe.com/payments/machine/mpp) (MPP) — an AI agent can place a paid order over HTTP with payment enforced by Stripe
 - **Modern UI** built with Next.js (App Router), React, and Tailwind CSS
 
 ## How it works
@@ -20,6 +21,42 @@ The app is a single-page wizard (`/`) with four steps:
    and confirmed client-side with Stripe Elements.
 4. **Confirmation** — once payment succeeds, `POST /api/send-mail` verifies the
    payment with Stripe and creates a Lob letter.
+
+## Agent access (Machine Payments Protocol)
+
+In addition to the interactive wizard, an autonomous agent can place a paid order
+machine-to-machine through `POST /api/agent/mail`, with payment enforced by Stripe's
+[Machine Payments Protocol](https://docs.stripe.com/payments/machine/mpp) (MPP).
+
+The request body matches the wizard's order:
+
+```json
+{
+  "fileUrl": "https://your-bucket.s3.us-east-1.amazonaws.com/pdfs/123-doc.pdf",
+  "mailType": "standard",
+  "address": {
+    "name": "Ada Lovelace",
+    "address_line1": "1 Main St",
+    "address_city": "San Francisco",
+    "address_state": "CA",
+    "address_zip": "94103",
+    "address_country": "US"
+  }
+}
+```
+
+The flow:
+
+1. The agent calls the endpoint. With no payment credential it receives
+   **`402 Payment Required`** plus an MPP challenge (price is set server-side from
+   `mailType`, so the caller can't pick its own amount).
+2. The agent settles the challenge with a Shared Payment Token and retries.
+3. MPP captures the payment through Stripe; the server then creates the Lob letter and
+   returns the tracking details with a `Payment-Receipt` header.
+
+The endpoint reuses the same Stripe and Lob clients as the rest of the app. It requires
+`MPP_SECRET_KEY` and `MPP_NETWORK_ID` (see [Environment variables](#environment-variables));
+without them the route fails loudly rather than skipping payment.
 
 ## Prerequisites
 
@@ -45,6 +82,11 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_...
 
 # Lob
 LOB_API_KEY=...
+
+# MPP (agent endpoint) — settles through Stripe, so STRIPE_SECRET_KEY is also required
+MPP_SECRET_KEY=...      # strong random value; binds 402 challenges to this server
+MPP_NETWORK_ID=internal # Stripe network id used for MPP charges
+MPP_REALM=              # optional; defaults to the deployment host
 ```
 
 ## Getting started
@@ -92,6 +134,7 @@ publicly readable:
 print-mail-service/
 ├── app/
 │   ├── api/
+│   │   ├── agent/mail/              # Agent endpoint (MPP-gated order + Lob letter)
 │   │   ├── create-payment-intent/   # Stripe PaymentIntent
 │   │   ├── send-mail/               # Lob letter creation
 │   │   └── upload/                  # PDF upload to S3
@@ -100,7 +143,7 @@ print-mail-service/
 │   ├── layout.tsx
 │   └── page.tsx                     # Print & mail wizard
 ├── components/                      # UI + flow components
-├── lib/                             # Stripe, Lob, and S3 clients
+├── lib/                             # Stripe, Lob, S3, and MPP clients + pricing
 ├── types/                           # Type declarations
 └── public/                          # Static assets
 ```
