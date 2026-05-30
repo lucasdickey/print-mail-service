@@ -58,6 +58,12 @@ The endpoint reuses the same Stripe and Lob clients as the rest of the app. It r
 `MPP_SECRET_KEY` and `MPP_NETWORK_ID` (see [Environment variables](#environment-variables));
 without them the route fails loudly rather than skipping payment.
 
+### Discovery
+
+`GET /api/agent/discovery` returns an OpenAPI 3.1 document describing the paid endpoint,
+including the MPP payment requirements under the `x-payment-info` extension, so an agent
+can auto-discover how to call and pay for `/api/agent/mail`.
+
 ## Prerequisites
 
 - Node.js 20.9.0 (see `.nvmrc`)
@@ -135,6 +141,7 @@ print-mail-service/
 ├── app/
 │   ├── api/
 │   │   ├── agent/mail/              # Agent endpoint (MPP-gated order + Lob letter)
+│   │   ├── agent/discovery/         # OpenAPI discovery doc for the agent endpoint
 │   │   ├── create-payment-intent/   # Stripe PaymentIntent
 │   │   ├── send-mail/               # Lob letter creation
 │   │   └── upload/                  # PDF upload to S3

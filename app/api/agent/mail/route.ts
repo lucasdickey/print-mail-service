@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { getLob } from "@/lib/lob"
 import { getMppx } from "@/lib/mppx"
-import { priceFor } from "@/lib/pricing"
+import { priceMajorUnits } from "@/lib/pricing"
 
 // MPP performs an HMAC verification and talks to Stripe, so this must run on
 // the Node.js runtime rather than the edge.
@@ -45,8 +45,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "File URL must be an S3 URL" }, { status: 400 })
   }
 
-  // Price is derived server-side (in cents) so the agent cannot dictate it.
-  const amount = String(priceFor(order.mailType))
+  // Price is derived server-side so the agent cannot dictate it. mppx's
+  // charge() expects the amount in major units (dollars) and converts to
+  // cents internally via `decimals`.
+  const amount = priceMajorUnits(order.mailType)
 
   const result = await getMppx().charge({
     amount,
