@@ -1,28 +1,29 @@
 import { NextResponse } from "next/server"
-import Stripe from "stripe"
+import { z } from "zod"
+import { getStripe } from "@/lib/stripe"
 
-// Initialize Stripe with the actual API key
-const stripe = new Stripe("zSAPq8mXbsRpedFX2nfUy7XrBYN8Hxke", {
-  apiVersion: "2023-10-16",
+const schema = z.object({
+  amount: z.number().int().positive(),
+  metadata: z.record(z.string(), z.string()).optional(),
 })
 
 export async function POST(request: Request) {
-  try {
-    const { amount, metadata } = await request.json()
+  const parsed = schema.safeParse(await request.json())
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  }
 
-    // Create a PaymentIntent with the order amount and currency
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
+  try {
+    const paymentIntent = await getStripe().paymentIntents.create({
+      amount: parsed.data.amount,
       currency: "usd",
-      automatic_payment_methods: {
-        enabled: true,
-      },
-      metadata,
+      automatic_payment_methods: { enabled: true },
+      metadata: parsed.data.metadata,
     })
 
     return NextResponse.json({ clientSecret: paymentIntent.client_secret })
   } catch (error) {
-    console.error("Error creating payment intent:", error)
-    return NextResponse.json({ error: "Error creating payment intent" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Failed to create payment intent"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

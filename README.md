@@ -1,69 +1,123 @@
 # Print Mail Service
 
-A modern web application that allows users to upload PDF documents, process payments, and send physical mail through the Lob API.
+A web application that lets users upload a PDF, pay for it, and have it printed and
+mailed to a physical address via the [Lob](https://www.lob.com/) API.
 
-![Print Mail Service](https://i.imgur.com/example-image.png)
+## Features
 
-## 🚀 Features
+- **PDF upload** to AWS S3
+- **Payment processing** with Stripe
+- **Physical mail delivery** through Lob
+- **Agent access** via the [Machine Payments Protocol](https://docs.stripe.com/payments/machine/mpp) (MPP) — an AI agent can place a paid order over HTTP with payment enforced by Stripe
+- **Modern UI** built with Next.js (App Router), React, and Tailwind CSS
 
-- **PDF Document Upload**: Upload PDF documents to AWS S3
-- **Payment Processing**: Secure payment handling with Stripe
-- **Physical Mail Delivery**: Send physical mail through Lob's API
-- **Order Tracking**: Track your mail orders with unique IDs
-- **Modern UI**: Clean, responsive interface built with Next.js and Tailwind CSS
+## How it works
 
-## 📋 Prerequisites
+The app is a single-page wizard (`/`) with four steps:
 
-Before you begin, ensure you have the following:
+1. **Upload** — the PDF is sent to `POST /api/upload` and stored in S3 (`pdfs/` prefix).
+2. **Address** — the user enters a US mailing address.
+3. **Payment** — a Stripe PaymentIntent is created (`POST /api/create-payment-intent`)
+   and confirmed client-side with Stripe Elements.
+4. **Confirmation** — once payment succeeds, `POST /api/send-mail` verifies the
+   payment with Stripe and creates a Lob letter.
 
-- Node.js 18.x or higher (specified in `.nvmrc`)
-- AWS account with S3 bucket configured
-- Stripe account for payment processing
-- Lob account for mail delivery services
-- Git for version control
+## Agent access (Machine Payments Protocol)
 
-## 🔧 Environment Variables
+In addition to the interactive wizard, an autonomous agent can place a paid order
+machine-to-machine through `POST /api/agent/mail`, with payment enforced by Stripe's
+[Machine Payments Protocol](https://docs.stripe.com/payments/machine/mpp) (MPP).
 
-Create a `.env.local` file in the root directory with the following variables:
+The request body matches the wizard's order:
 
+```json
+{
+  "fileUrl": "https://your-bucket.s3.us-east-1.amazonaws.com/pdfs/123-doc.pdf",
+  "mailType": "standard",
+  "address": {
+    "name": "Ada Lovelace",
+    "address_line1": "1 Main St",
+    "address_city": "San Francisco",
+    "address_state": "CA",
+    "address_zip": "94103",
+    "address_country": "US"
+  }
+}
 ```
-# AWS Configuration
-AWS_REGION=your-aws-region
-AWS_ACCESS_KEY_ID=your-access-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-access-key
-AWS_S3_BUCKET=your-s3-bucket-name
 
-# Stripe Configuration
-STRIPE_SECRET_KEY=your-stripe-secret-key
-STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
+The flow:
 
-# Lob Configuration
-LOB_API_KEY=your-lob-api-key
+1. The agent calls the endpoint. With no payment credential it receives
+   **`402 Payment Required`** plus an MPP challenge (price is set server-side from
+   `mailType`, so the caller can't pick its own amount).
+2. The agent settles the challenge with a Shared Payment Token and retries.
+3. MPP captures the payment through Stripe; the server then creates the Lob letter and
+   returns the tracking details with a `Payment-Receipt` header.
+
+The endpoint reuses the same Stripe and Lob clients as the rest of the app. It requires
+`MPP_SECRET_KEY` and `MPP_NETWORK_ID` (see [Environment variables](#environment-variables));
+without them the route fails loudly rather than skipping payment.
+
+### Discovery
+
+`GET /api/agent/discovery` returns an OpenAPI 3.1 document describing the paid endpoint,
+including the MPP payment requirements under the `x-payment-info` extension, so an agent
+can auto-discover how to call and pay for `/api/agent/mail`.
+
+## Prerequisites
+
+- Node.js 20.9.0 (see `.nvmrc`)
+- An AWS account with an S3 bucket
+- A Stripe account
+- A Lob account
+
+## Environment variables
+
+Copy `.env.example` to `.env.local` and fill in the values:
+
+```bash
+# AWS S3
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_S3_BUCKET=your-bucket-name
+
+# Stripe
+STRIPE_SECRET_KEY=sk_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_...
+
+# Lob
+LOB_API_KEY=...
+
+# MPP (agent endpoint) — settles through Stripe, so STRIPE_SECRET_KEY is also required
+MPP_SECRET_KEY=...      # strong random value; binds 402 challenges to this server
+MPP_NETWORK_ID=internal # Stripe network id used for MPP charges
+MPP_REALM=              # optional; defaults to the deployment host
 ```
 
-## 🛠️ Installation
+## Getting started
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/print-mail-service.git
-   cd print-mail-service
-   ```
+```bash
+npm install
+npm run dev
+```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+Open [http://localhost:3000](http://localhost:3000).
 
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
+### Scripts
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+| Script              | Description                          |
+| ------------------- | ------------------------------------ |
+| `npm run dev`       | Start the development server         |
+| `npm run build`     | Production build (runs TS + ESLint)  |
+| `npm run start`     | Serve the production build           |
+| `npm run lint`      | Run ESLint                           |
+| `npm run typecheck` | Type-check with `tsc --noEmit`       |
 
-## 📝 S3 Bucket Policy
+## S3 bucket policy
 
-For Lob to access your uploaded PDF files, ensure your S3 bucket has the appropriate policy. The bucket policy should allow public read access for files in the pdfs directory without referrer restrictions:
+Lob fetches the uploaded PDF over HTTP, so objects under the `pdfs/` prefix must be
+publicly readable:
 
 ```json
 {
@@ -80,55 +134,36 @@ For Lob to access your uploaded PDF files, ensure your S3 bucket has the appropr
 }
 ```
 
-## 🏗️ Project Structure
+## Project structure
 
 ```
 print-mail-service/
-├── app/                   # Next.js app directory
-│   ├── api/               # API routes
-│   │   ├── send-mail/     # Lob API integration
-│   │   └── upload-file/   # S3 upload functionality
-│   ├── layout.tsx         # Root layout component
-│   └── page.tsx           # Home page
-├── components/            # Reusable UI components
-├── public/                # Static assets
-├── .env.local             # Environment variables (not tracked by git)
-├── .nvmrc                 # Node.js version specification
-├── package.json           # Project dependencies
-├── tailwind.config.js     # Tailwind CSS configuration
-└── vercel.json            # Vercel deployment configuration
+├── app/
+│   ├── api/
+│   │   ├── agent/mail/              # Agent endpoint (MPP-gated order + Lob letter)
+│   │   ├── agent/discovery/         # OpenAPI discovery doc for the agent endpoint
+│   │   ├── create-payment-intent/   # Stripe PaymentIntent
+│   │   ├── send-mail/               # Lob letter creation
+│   │   └── upload/                  # PDF upload to S3
+│   ├── orders/                      # Order history (demo data)
+│   ├── payment-success/             # Stripe redirect target
+│   ├── layout.tsx
+│   └── page.tsx                     # Print & mail wizard
+├── components/                      # UI + flow components
+├── lib/                             # Stripe, Lob, S3, and MPP clients + pricing
+├── types/                           # Type declarations
+└── public/                          # Static assets
 ```
 
-## 🚢 Deployment
+## Tech stack
 
-This application is configured for deployment on Vercel:
-
-1. Push your code to GitHub
-2. Connect your repository to Vercel
-3. Configure environment variables in Vercel dashboard
-4. Deploy!
-
-## 🧪 Testing
-
-Run the test suite with:
-
-```bash
-npm test
-```
-
-## 📚 Tech Stack
-
-- **Frontend**: Next.js, React 18, Tailwind CSS
-- **Backend**: Next.js API Routes
+- **Framework**: Next.js (App Router), React, TypeScript
+- **Styling**: Tailwind CSS, shadcn/ui
 - **Storage**: AWS S3
-- **Payment**: Stripe
-- **Mail Service**: Lob
+- **Payments**: Stripe
+- **Mail**: Lob
 - **Deployment**: Vercel
 
-## 🤝 Contributing
+## License
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT

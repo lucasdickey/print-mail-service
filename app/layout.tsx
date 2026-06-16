@@ -10,7 +10,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "PDF Print & Mail Service",
   description: "Upload PDFs and have them printed and mailed to any address",
-  generator: 'v0.dev'
 }
 
 export default function RootLayout({

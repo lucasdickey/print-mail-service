@@ -7,7 +7,7 @@ export default function Home() {
       <Navbar />
       <div className="container mx-auto py-8 px-4">
         <h1 className="text-3xl font-bold text-center mb-2">Print & Mail Your Documents</h1>
-        <p className="text-center text-gray-500 mb-8">Using secure base64 encoding for file uploads</p>
+        <p className="text-center text-gray-500 mb-8">Upload a PDF, choose a destination, and we will print and mail it for you</p>
         <div className="max-w-4xl mx-auto">
           <PrintMailWizard />
         </div>
